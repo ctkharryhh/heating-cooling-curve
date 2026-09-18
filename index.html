@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Heating & Cooling Curve of Water</title>
+    <style>
+        :root {
+            --primary: #00d2ff;
+            --primary-dark: #3a7bd5;
+            --bg-gradient: linear-gradient(135deg, #0f1115 0%, #1a1d24 100%);
+            --panel-bg: rgba(30, 33, 40, 0.85);
+            --text-color: #ffffff;
+            --highlight: #ffeb3b;
+            --danger: #ff4757;
+            --cooling: #9b59b6;
+            --heating: #e67e22;
+            --glass-border: rgba(255, 255, 255, 0.08);
+        }
+        
+        body {
+            margin: 0;
+            padding: 15px;
+            background: var(--bg-gradient);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            box-sizing: border-box;
+            overflow: hidden;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        header {
+            text-align: center;
+            padding: 10px 0 15px 0;
+        }
+
+        h1 {
+            margin: 0;
+            font-size: 26px;
+            background: -webkit-linear-gradient(45deg, var(--primary), #a6ffcb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+
+        #main-container {
+            display: flex;
+            flex: 1;
+            gap: 20px;
+            min-height: 0;
+            justify-content: center;
+        }
+
+        .panel {
+            background: var(--panel-bg);
+            border-radius: 16px;
+            padding: 15px;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            width: 100%;
+            max-width: 500px;
+        }
+
+        canvas {
+            background-color: #08090b;
+            border-radius: 12px;
+            border: 1px solid #222;
+            width: 100%;
+            height: auto;
+            aspect-ratio: 1 / 1;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8);
+        }
+
+        #live-temp-overlay {
+            position: absolute;
+            top: 25px;
+            font-size: 28px;
+            font-weight: 900;
+            color: #ffffff;
+            text-shadow: 0 0 15px rgba(0, 210, 255, 0.8), 0 0 5px rgba(0, 210, 255, 1);
+            z-index: 5;
+            letter-spacing: 1px;
+            background: rgba(0, 0, 0, 0.4);
+            padding: 5px 20px;
+            border-radius: 20px;
+            border: 1px solid rgba(0, 210, 255, 0.3);
+        }
+
+        #dashboard {
+            margin-top: 15px;
+            background: var(--panel-bg);
+            padding: 15px 20px;
+            border-radius: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: stretch;
+            flex-wrap: wrap;
+            gap: 15px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+        }
+
+        .info-box {
+            flex: 1;
+            min-width: 140px;
+            background: linear-gradient(145deg, #242832, #1b1e25);
+            padding: 12px 15px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: #aaa;
+            border-left: 4px solid var(--primary);
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.2);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .info-box span {
+            display: inline-block; 
+            font-size: 16px;
+            font-weight: 700;
+            color: #fff;
+            margin-top: 6px;
+            text-shadow: 0 0 10px rgba(255,255,255,0.2);
+            transform-origin: left center;
+            transition: color 0.3s ease;
+        }
+
+        @keyframes expand-contract {
+            0% { transform: scale(1); text-shadow: 0 0 10px currentColor; }
+            50% { transform: scale(1.08); text-shadow: 0 0 20px currentColor; }
+            100% { transform: scale(1); text-shadow: 0 0 10px currentColor; }
+        }
+
+        .pulse-active {
+            animation: expand-contract 1s ease-in-out infinite;
+        }
+
+        .info-box:nth-child(2) { border-left-color: #a6ffcb; }
+        .info-box:nth-child(3) { border-left-color: var(--danger); }
+        .info-box:nth-child(4) { border-left-color: var(--highlight); }
+
+        .controls-wrapper {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            min-width: 220px;
+            justify-content: center;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        button {
+            flex: 1;
+            padding: 12px 15px;
+            font-size: 15px;
+            font-weight: 800;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            color: white;
+            transition: all 0.2s ease;
+            touch-action: manipulation;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+
+        #btnPlayPause { background: linear-gradient(135deg, var(--primary), var(--primary-dark)); }
+        #btnPlayPause:active { transform: translateY(2px); box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        
+        #btnReset { background: linear-gradient(135deg, #ff6b81, var(--danger)); }
+        #btnReset:active { transform: translateY(2px); box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+        
+        #btnToggleMode { 
+            background: linear-gradient(135deg, var(--cooling), #8e44ad); 
+            width: 100%;
+        }
+        #btnToggleMode:active { transform: translateY(2px); box-shadow: 0 2px 10px rgba(0,0,0,0.3); }
+
+        @media (max-width: 820px) {
+            #main-container { flex-direction: column; align-items: center; overflow-y: auto; }
+            .panel { max-width: 90vw; }
+            body { height: auto; overflow-y: auto; }
+            #dashboard { flex-direction: column; align-items: stretch; }
+            .controls-wrapper { width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1 id="main-title">Heating Curve & Molecular States of Water</h1>
+    </header>
+
+    <div id="main-container">
+        <!-- Molecular Animation Canvas -->
+        <div id="animation-panel" class="panel">
+            <div id="live-temp-overlay">-25.0 °C</div>
+            <canvas id="molCanvas" width="500" height="500"></canvas>
+        </div>
+
+        <!-- Heat Curve Canvas -->
+        <div id="graph-panel" class="panel">
+            <canvas id="graphCanvas" width="500" height="500"></canvas>
+        </div>
+    </div>
+
+    <!-- Live Data Dashboard -->
+    <div id="dashboard">
+        <div class="info-box">Temperature (°C) <br><span id="temp-val">-25.0 °C</span></div>
+        <div class="info-box">Phase / State <br><span id="state-val" style="color: #a6ffcb;">Ice (Solid)</span></div>
+        <div class="info-box">Avg. Kinetic Energy (KE) <br><span id="ke-val" style="color: var(--danger);">Low (Vibrating)</span></div>
+        <div class="info-box">Avg. Potential Energy (PE) <br><span id="pe-val" style="color: var(--highlight);">Lowest (Fixed Bonds)</span></div>
+        
+        <div class="controls-wrapper">
+            <div class="btn-row">
+                <button id="btnPlayPause">Play</button>
+                <button id="btnReset">Reset</button>
+            </div>
+            <button id="btnToggleMode">Switch to Cooling Curve</button>
+        </div>
+    </div>
+
+<script>
+    // System variables
+    let mode = 'heating'; // 'heating' or 'cooling'
+    let time = 0; 
+    let temperature = -25;
+    let isPlaying = false;
+    let reqFrame;
+    
+    // Total time duration for complete cycle
+    const TOTAL_TIME = 1100; 
+    
+    // Canvas setup
+    const molCanvas = document.getElementById('molCanvas');
+    const mCtx = molCanvas.getContext('2d');
+    const graphCanvas = document.getElementById('graphCanvas');
+    const gCtx = graphCanvas.getContext('2d');
+    const liveTempOverlay = document.getElementById('live-temp-overlay');
+    
+    // UI Elements
+    const mainTitle = document.getElementById('main-title');
+    const tempVal = document.getElementById('temp-val');
+    const stateVal = document.getElementById('state-val');
+    const keVal = document.getElementById('ke-val');
+    const peVal = document.getElementById('pe-val');
+    const btnPlayPause = document.getElementById('btnPlayPause');
+    const btnReset = document.getElementById('btnReset');
+    const btnToggleMode = document.getElementById('btnToggleMode');
+
+    // Particles setup
+    const numCols = 9;
+    const numRows = 7;
+    let particles = [];
+    
+    const cW = 500;
+    const cH = 500;
+    const bWidth = 280;
+    const bHeight = 360;
+    const bX = (cW - bWidth) / 2;
+    const bY = (cH - bHeight) / 2 + 30;
+
+    function initParticles() {
+        particles = [];
+        const spacing = 22;
+        const startX = bX + (bWidth - (numCols - 1) * spacing) / 2;
+        const startY = bY + bHeight - 20 - (numRows * spacing);
+
+        for (let row = 0; row < numRows; row++) {
+            for (let col = 0; col < numCols; col++) {
+                let bx = startX + col * spacing;
+                let by = startY + row * spacing;
+
+                if (mode === 'heating') {
+                    // Starts as Ice Grid
+                    particles.push({
+                        baseX: bx, baseY: by,
+                        x: bx, y: by,
+                        vx: (Math.random() - 0.5) * 2.5,
+                        vy: (Math.random() - 0.5) * 2.5,
+                        isFree: false, 
+                        isGas: false   
+                    });
+                } else {
+                    // Starts as Steam (Scattered everywhere)
+                    particles.push({
+                        baseX: bx, baseY: by,
+                        x: 10 + Math.random() * (cW - 20),
+                        y: 10 + Math.random() * (bY + bHeight - 20),
+                        vx: (Math.random() - 0.5) * 5,
+                        vy: (Math.random() - 0.5) * 5,
+                        isFree: true, 
+                        isGas: true   
+                    });
+                }
+            }
+        }
+    }
+
+    function updatePhysics(forceUpdate = false) {
+        if (!forceUpdate) time += 0.5; // Advance time
+        
+        let phase = "";
+        let keText = "";
+        let peText = "";
+        let isKeActive = false;
+        let isPeActive = false;
+
+        if (mode === 'heating') {
+            // 1. Heating Ice (-25 to 0) -> time: 0 to 150
+            if (time < 150) {
+                temperature = -25 + (25 * (time / 150));
+                phase = "Ice (Solid)";
+                keText = "Increasing (Moving faster)";
+                peText = "Constant (Bonds intact)";
+                isKeActive = true;
+            } 
+            // 2. Melting Point (0) -> time: 150 to 400
+            else if (time >= 150 && time < 400) {
+                temperature = 0;
+                phase = "Melting (Solid ➔ Liquid)";
+                keText = "Constant (Temp is constant)";
+                peText = "Increasing (Breaking lattice bonds)";
+                isPeActive = true;
+
+                let progress = (time - 150) / 250;
+                let targetMelted = Math.floor(progress * particles.length);
+                let currentlyMelted = particles.filter(p => p.isFree).length;
+                
+                while (currentlyMelted < targetMelted) {
+                    let solidParticles = particles.filter(p => !p.isFree);
+                    if (solidParticles.length > 0) {
+                        let randIndex = Math.floor(Math.random() * solidParticles.length);
+                        solidParticles[randIndex].isFree = true;
+                        currentlyMelted++;
+                    } else break;
+                }
+            } 
+            // 3. Heating Water (0 to 100) -> time: 400 to 600
+            else if (time >= 400 && time < 600) {
+                temperature = 100 * ((time - 400) / 200);
+                phase = "Water (Liquid)";
+                keText = "Increasing (Moving faster)";
+                peText = "Constant";
+                isKeActive = true;
+                particles.forEach(p => p.isFree = true); 
+            }
+            // 4. Boiling Point (100) -> time: 600 to 950
+            else if (time >= 600 && time < 950) {
+                temperature = 100;
+                phase = "Boiling (Liquid ➔ Gas)";
+                keText = "Constant (Temp is constant)";
+                peText = "Increasing Rapidly (Overcoming bonds)";
+                isPeActive = true;
+                
+                let progress = (time - 600) / 350;
+                let targetBoiled = Math.floor(progress * particles.length);
+                let currentlyBoiled = particles.filter(p => p.isGas).length;
+
+                while (currentlyBoiled < targetBoiled) {
+                    let liquidParticles = particles.filter(p => !p.isGas);
+                    if (liquidParticles.length > 0) {
+                        let randIndex = Math.floor(Math.random() * liquidParticles.length);
+                        let p = liquidParticles[randIndex];
+                        p.isGas = true;
+                        p.vy = -Math.abs(p.vy) * 2; 
+                        currentlyBoiled++;
+                    } else break;
+                }
+            } 
+            // 5. Steam (100+) -> time: 950 to 1100
+            else {
+                temperature = 100 + 20 * ((time - 950) / 150);
+                phase = "Steam (Gas)";
+                keText = "Increasing (Rapid random movement)";
+                peText = "Highest (Molecules separate)";
+                isKeActive = true;
+                particles.forEach(p => p.isGas = true); 
+                
+                if (temperature >= 120) {
+                    temperature = 120;
+                    isPlaying = false;
+                    btnPlayPause.innerText = "Restart";
+                }
+            }
+        } 
+        
+        else if (mode === 'cooling') {
+            // 1. Cooling Steam (120 to 100) -> time: 0 to 150
+            if (time < 150) {
+                temperature = 120 - (20 * (time / 150));
+                phase = "Steam (Gas)";
+                keText = "Decreasing (Slowing down)";
+                peText = "Highest (Molecules separate)";
+                isKeActive = true;
+            } 
+            // 2. Condensing (100) -> time: 150 to 500
+            else if (time >= 150 && time < 500) {
+                temperature = 100;
+                phase = "Condensing (Gas ➔ Liquid)";
+                keText = "Constant (Temp is constant)";
+                peText = "Decreasing (Forming fluid bonds)";
+                isPeActive = true;
+                
+                let progress = (time - 150) / 350;
+                let targetCondensed = Math.floor(progress * particles.length);
+                let currentlyCondensed = particles.filter(p => !p.isGas).length;
+                
+                while (currentlyCondensed < targetCondensed) {
+                    let gasParticles = particles.filter(p => p.isGas);
+                    if (gasParticles.length > 0) {
+                        let randIndex = Math.floor(Math.random() * gasParticles.length);
+                        gasParticles[randIndex].isGas = false;
+                        currentlyCondensed++;
+                    } else break;
+                }
+            } 
+            // 3. Cooling Water (100 to 0) -> time: 500 to 700
+            else if (time >= 500 && time < 700) {
+                temperature = 100 - (100 * ((time - 500) / 200));
+                phase = "Water (Liquid)";
+                keText = "Decreasing (Moving slower)";
+                peText = "Low";
+                isKeActive = true;
+                particles.forEach(p => p.isGas = false);
+            } 
+            // 4. Freezing (0) -> time: 700 to 950
+            else if (time >= 700 && time < 950) {
+                temperature = 0;
+                phase = "Freezing (Liquid ➔ Solid)";
+                keText = "Constant (Temp is constant)";
+                peText = "Decreasing (Forming rigid lattice)";
+                isPeActive = true;
+                
+                let progress = (time - 700) / 250;
+                let targetFrozen = Math.floor(progress * particles.length);
+                let currentlyFrozen = particles.filter(p => !p.isFree).length;
+                
+                while (currentlyFrozen < targetFrozen) {
+                    let liqParticles = particles.filter(p => p.isFree);
+                    if (liqParticles.length > 0) {
+                        let randIndex = Math.floor(Math.random() * liqParticles.length);
+                        liqParticles[randIndex].isFree = false;
+                        currentlyFrozen++;
+                    } else break;
+                }
+            } 
+            // 5. Cooling Ice (0 to -25) -> time: 950 to 1100
+            else {
+                temperature = 0 - 25 * ((time - 950) / 150);
+                phase = "Ice (Solid)";
+                keText = "Decreasing (Less vibration)";
+                peText = "Lowest (Fixed Bonds)";
+                isKeActive = true;
+                particles.forEach(p => p.isFree = false);
+                
+                if (temperature <= -25) {
+                    temperature = -25;
+                    isPlaying = false;
+                    btnPlayPause.innerText = "Restart";
+                }
+            }
+        }
+
+        let tempString = temperature.toFixed(1) + " °C";
+        tempVal.innerText = tempString;
+        liveTempOverlay.innerText = tempString; 
+        
+        stateVal.innerText = phase;
+        keVal.innerText = keText;
+        peVal.innerText = peText;
+
+        if (isKeActive) keVal.classList.add('pulse-active');
+        else keVal.classList.remove('pulse-active');
+        
+        if (isPeActive) peVal.classList.add('pulse-active');
+        else peVal.classList.remove('pulse-active');
+    }
+
+    function moveParticles() {
+        let vibAmp = 1 + (temperature + 25) / 20; 
+        let moveSpeed = 1 + (temperature / 50);
+
+        particles.forEach(p => {
+            if (!p.isFree) {
+                // Freezing effect: Smoothly snap to lattice
+                let dx = p.baseX - p.x;
+                let dy = p.baseY - p.y;
+                let dist = Math.sqrt(dx*dx + dy*dy);
+                
+                if (dist > 3) {
+                    p.x += dx * 0.1;
+                    p.y += dy * 0.1;
+                } else {
+                    // Vibrate at fixed position
+                    p.x = p.baseX + (Math.random() - 0.5) * vibAmp * 2.5;
+                    p.y = p.baseY + (Math.random() - 0.5) * vibAmp * 2.5;
+                }
+            } 
+            else if (p.isFree && !p.isGas) {
+                let liqTop = bY + bHeight * 0.55;
+                
+                // Condensing effect: Fall gently into the beaker
+                if (p.y < liqTop - 5) {
+                    p.y += 3.5; // Gravity/falling speed
+                    p.x += p.vx * moveSpeed;
+                    if (p.x < 10 || p.x > cW - 10) p.vx *= -1;
+                } 
+                // Liquid bounding box
+                else {
+                    p.x += p.vx * moveSpeed;
+                    p.y += p.vy * moveSpeed;
+                    
+                    if (p.x < bX + 8 || p.x > bX + bWidth - 8) p.vx *= -1;
+                    if (p.y < liqTop || p.y > bY + bHeight - 8) p.vy *= -1;
+                    
+                    p.x = Math.max(bX + 8, Math.min(bX + bWidth - 8, p.x));
+                    p.y = Math.max(liqTop, Math.min(bY + bHeight - 8, p.y));
+                }
+            } 
+            else if (p.isGas) {
+                // Gas bouncing everywhere
+                p.x += p.vx * moveSpeed * 2.5;
+                p.y += p.vy * moveSpeed * 2.5;
+                
+                if (p.x < 10 || p.x > cW - 10) p.vx *= -1;
+                if (p.y < 10 || p.y > bY + bHeight - 8) p.vy *= -1;
+            }
+        });
+    }
+
+    function drawMolecules() {
+        mCtx.clearRect(0, 0, cW, cH);
+
+        let beakerGrad = mCtx.createLinearGradient(bX, 0, bX + bWidth, 0);
+        beakerGrad.addColorStop(0, "rgba(255,255,255,0.4)");
+        beakerGrad.addColorStop(0.2, "rgba(255,255,255,0.1)");
+        beakerGrad.addColorStop(0.8, "rgba(255,255,255,0.1)");
+        beakerGrad.addColorStop(1, "rgba(255,255,255,0.4)");
+
+        mCtx.fillStyle = "rgba(255,255,255,0.03)";
+        mCtx.fillRect(bX, bY, bWidth, bHeight);
+
+        mCtx.strokeStyle = beakerGrad;
+        mCtx.lineWidth = 5;
+        mCtx.beginPath();
+        mCtx.moveTo(bX - 5, bY); 
+        mCtx.lineTo(bX, bY);
+        mCtx.lineTo(bX, bY + bHeight);
+        mCtx.lineTo(bX + bWidth, bY + bHeight);
+        mCtx.lineTo(bX + bWidth, bY);
+        mCtx.lineTo(bX + bWidth + 5, bY); 
+        mCtx.stroke();
+        
+        mCtx.shadowBlur = 8;
+
+        particles.forEach(p => {
+            mCtx.beginPath();
+            mCtx.arc(p.x, p.y, 7, 0, Math.PI * 2);
+            
+            if (p.isGas) {
+                mCtx.fillStyle = "#81ecec"; mCtx.shadowColor = "#81ecec";
+            } else if (p.isFree) {
+                mCtx.fillStyle = "#0984e3"; mCtx.shadowColor = "#0984e3";
+            } else {
+                mCtx.fillStyle = "#00d2ff"; mCtx.shadowColor = "#00d2ff";
+            }
+            mCtx.fill();
+        });
+        mCtx.shadowBlur = 0;
+    }
+
+    function drawGraph() {
+        gCtx.clearRect(0, 0, cW, cH);
+        
+        const padLeft = 85;
+        const padBottom = 70;
+        const padTop = 40;
+        const padRight = 30;
+        
+        const w = cW - padLeft - padRight;
+        const h = cH - padTop - padBottom;
+        
+        const mapX = (t) => padLeft + (t / TOTAL_TIME) * w;
+
+        const mapY = (T) => {
+            let percent;
+            if (T <= 0) percent = 1.0 - ((T + 25) / 25) * 0.25; 
+            else if (T <= 100) percent = 0.75 - (T / 100) * 0.50;      
+            else percent = 0.25 - ((T - 100) / 20) * 0.25;
+            return padTop + percent * h;
+        };
+
+        // 1. Draw Ideal Background Curve (Adapts to Mode)
+        gCtx.strokeStyle = "#555555";
+        gCtx.lineWidth = 4;
+        gCtx.lineCap = "round";
+        gCtx.lineJoin = "round";
+        gCtx.beginPath();
+        if (mode === 'heating') {
+            gCtx.moveTo(mapX(0), mapY(-25));
+            gCtx.lineTo(mapX(150), mapY(0));
+            gCtx.lineTo(mapX(400), mapY(0));
+            gCtx.lineTo(mapX(600), mapY(100));
+            gCtx.lineTo(mapX(950), mapY(100));
+            gCtx.lineTo(mapX(1100), mapY(120));
+        } else {
+            gCtx.moveTo(mapX(0), mapY(120));
+            gCtx.lineTo(mapX(150), mapY(100));
+            gCtx.lineTo(mapX(500), mapY(100));
+            gCtx.lineTo(mapX(700), mapY(0));
+            gCtx.lineTo(mapX(950), mapY(0));
+            gCtx.lineTo(mapX(1100), mapY(-25));
+        }
+        gCtx.stroke();
+
+        // 2. Reference Gridlines
+        gCtx.textAlign = "right";
+        gCtx.textBaseline = "middle";
+
+        gCtx.strokeStyle = "rgba(255, 255, 255, 0.3)";
+        gCtx.lineWidth = 2;
+        gCtx.setLineDash([6, 6]);
+        
+        let y0 = mapY(0);
+        gCtx.beginPath(); gCtx.moveTo(padLeft, y0); gCtx.lineTo(padLeft + w, y0); gCtx.stroke();
+        
+        let y100 = mapY(100);
+        gCtx.beginPath(); gCtx.moveTo(padLeft, y100); gCtx.lineTo(padLeft + w, y100); gCtx.stroke();
+        gCtx.setLineDash([]); 
+
+        // 3. Y-axis Labels
+        gCtx.fillStyle = "#00d2ff"; 
+        gCtx.font = "bold 13px -apple-system, sans-serif";
+        gCtx.fillText(mode === 'heating' ? "Melting Point" : "Freezing Point", padLeft - 10, y0 - 14);
+        gCtx.fillStyle = "#ffffff";
+        gCtx.font = "bold 14px -apple-system, sans-serif";
+        gCtx.fillText("0°C", padLeft - 10, y0 + 6);
+        
+        gCtx.fillStyle = "#00d2ff";
+        gCtx.font = "bold 13px -apple-system, sans-serif";
+        gCtx.fillText(mode === 'heating' ? "Boiling Point" : "Condensation", padLeft - 10, y100 - 14);
+        gCtx.fillStyle = "#ffffff";
+        gCtx.font = "bold 14px -apple-system, sans-serif";
+        gCtx.fillText("100°C", padLeft - 10, y100 + 6);
+
+        let yMinus25 = mapY(-25);
+        gCtx.fillStyle = "#ffffff";
+        gCtx.font = "bold 14px -apple-system, sans-serif";
+        gCtx.fillText("-25°C", padLeft - 10, yMinus25);
+        
+        let y120 = mapY(120);
+        gCtx.fillText("120°C", padLeft - 10, y120);
+
+        // 4. Solid Axes
+        gCtx.strokeStyle = "#ffffff";
+        gCtx.lineWidth = 3;
+        gCtx.beginPath();
+        gCtx.moveTo(padLeft, padTop - 10);
+        gCtx.lineTo(padLeft, padTop + h);
+        gCtx.lineTo(padLeft + w + 10, padTop + h);
+        gCtx.stroke();
+        
+        gCtx.fillStyle = "#ffffff";
+        gCtx.textAlign = "center";
+        gCtx.fillText(mode === 'heating' ? "Heat Added (Time)" : "Heat Removed (Time)", padLeft + w/2, padTop + h + 45);
+        
+        gCtx.save();
+        gCtx.translate(25, padTop + h/2);
+        gCtx.rotate(-Math.PI / 2);
+        gCtx.fillText("Temperature (°C)", 0, 0);
+        gCtx.restore();
+
+        // 5. Draw Progress Line 
+        let lineColor = mode === 'heating' ? "#ff4757" : "#00d2ff";
+        gCtx.strokeStyle = lineColor;
+        gCtx.lineWidth = 5;
+        gCtx.shadowBlur = 12;
+        gCtx.shadowColor = lineColor; 
+        gCtx.beginPath();
+        
+        if (mode === 'heating') {
+            gCtx.moveTo(mapX(0), mapY(-25));
+            if (time > 0) gCtx.lineTo(mapX(Math.min(time, 150)), mapY(Math.min(temperature, 0)));
+            if (time > 150) gCtx.lineTo(mapX(Math.min(time, 400)), mapY(0));
+            if (time > 400) gCtx.lineTo(mapX(Math.min(time, 600)), mapY(Math.min(temperature, 100)));
+            if (time > 600) gCtx.lineTo(mapX(Math.min(time, 950)), mapY(100));
+            if (time > 950) gCtx.lineTo(mapX(Math.min(time, 1100)), mapY(Math.min(temperature, 120)));
+        } else {
+            gCtx.moveTo(mapX(0), mapY(120));
+            if (time > 0) gCtx.lineTo(mapX(Math.min(time, 150)), mapY(Math.max(temperature, 100)));
+            if (time > 150) gCtx.lineTo(mapX(Math.min(time, 500)), mapY(100));
+            if (time > 500) gCtx.lineTo(mapX(Math.min(time, 700)), mapY(Math.max(temperature, 0)));
+            if (time > 700) gCtx.lineTo(mapX(Math.min(time, 950)), mapY(0));
+            if (time > 950) gCtx.lineTo(mapX(Math.min(time, 1100)), mapY(Math.max(temperature, -25)));
+        }
+        gCtx.stroke();
+
+        // 6. Draw Current Position Dot
+        gCtx.fillStyle = "#ffeb3b";
+        gCtx.shadowBlur = 15;
+        gCtx.shadowColor = "#ffeb3b";
+        gCtx.beginPath();
+        gCtx.arc(mapX(time), mapY(temperature), 8, 0, Math.PI * 2);
+        gCtx.fill();
+        gCtx.shadowBlur = 0; 
+    }
+
+    function loop() {
+        if (isPlaying) {
+            updatePhysics();
+        }
+        
+        // Always calculate particle motion (continues even when paused)
+        moveParticles();
+        drawMolecules();
+        drawGraph();
+        reqFrame = requestAnimationFrame(loop);
+    }
+
+    function resetSimulation() {
+        time = 0;
+        isPlaying = false;
+        btnPlayPause.innerText = "Play";
+        btnPlayPause.disabled = false;
+        btnPlayPause.style.opacity = '1';
+        
+        temperature = mode === 'heating' ? -25 : 120;
+        
+        keVal.classList.remove('pulse-active');
+        peVal.classList.remove('pulse-active');
+
+        initParticles();
+        updatePhysics(true); // Force update UI without advancing time
+        drawMolecules();
+        drawGraph();
+    }
+
+    // Button Events
+    btnPlayPause.addEventListener('click', () => {
+        if (time >= TOTAL_TIME) {
+            resetSimulation();
+            btnPlayPause.click(); // Auto start on restart
+            return;
+        }
+        isPlaying = !isPlaying;
+        btnPlayPause.innerText = isPlaying ? "Pause" : "Play";
+    });
+
+    btnReset.addEventListener('click', resetSimulation);
+
+    btnToggleMode.addEventListener('click', () => {
+        // Toggle the modes
+        mode = mode === 'heating' ? 'cooling' : 'heating';
+        
+        // Update Title & Button text
+        mainTitle.innerText = mode === 'heating' 
+            ? "Heating Curve & Molecular States of Water" 
+            : "Cooling Curve & Molecular States of Water";
+            
+        btnToggleMode.innerText = mode === 'heating' 
+            ? "Switch to Cooling Curve" 
+            : "Switch to Heating Curve";
+            
+        // Toggle Color Themes
+        if(mode === 'heating') {
+            btnToggleMode.style.background = "linear-gradient(135deg, var(--cooling), #8e44ad)";
+            keVal.style.color = "var(--danger)";
+            peVal.style.color = "var(--highlight)";
+        } else {
+            btnToggleMode.style.background = "linear-gradient(135deg, var(--heating), #d35400)";
+            keVal.style.color = "#00d2ff"; // Blue for cooling active state
+            peVal.style.color = "#a6ffcb"; // Mint for cooling bonds
+        }
+        
+        resetSimulation();
+    });
+
+    // Initialize Application
+    initParticles();
+    updatePhysics(true);
+    loop();
+
+</script>
+</body>
+</html>
